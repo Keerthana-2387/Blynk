@@ -1,0 +1,60 @@
+<script type="text/javascript">
+        // 1. YOUR SETTINGS
+        const URL = "https://teachablemachine.withgoogle.com/models/kIltfUe4g/"; 
+        const BLYNK_TOKEN = "xjwMcBYmcYtGLywSK6HVQkbw1ce0NVoN"; 
+
+        let model, webcam, labelContainer, maxPredictions;
+        let lastValue = -1; 
+
+        async function init() {
+            try {
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // Setup webcam with mobile-friendly settings
+                const flip = true; 
+                webcam = new tmImage.Webcam(200, 200, flip); 
+                await webcam.setup({ facingMode: "environment" }); // Uses back camera if available
+                
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                // Add to UI
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = ""; // Clear old labels
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+            } catch (e) {
+                alert("Error starting camera: " + e);
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            
+            // Send 1 to Blynk if first class > 90%, else 0
+            let currentValue = prediction[0].probability > 0.9 ? 1 : 0;
+
+            if (currentValue !== lastValue) {
+                lastValue = currentValue;
+                // 'no-cors' helps prevent browser security blocks for simple updates
+                fetch(`https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&v1=${currentValue}`, {mode: 'no-cors'})
+                .catch(err => console.log("Blynk Update error (usually safe to ignore):", err));
+            }
+
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.childNodes[i].innerHTML = 
+                    prediction[i].className + ": " + (prediction[i].probability * 100).toFixed(0) + "%";
+            }
+        }
+    </script>
