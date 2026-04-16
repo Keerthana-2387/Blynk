@@ -81,7 +81,6 @@
         async function predict() {
             const prediction = await model.predict(webcam.canvas);
             
-            // 1. Find the class with the highest probability
             let highestProb = 0;
             let bestClassIndex = 0;
 
@@ -92,17 +91,22 @@
                 }
             }
 
-            // 2. Only update Blynk if confidence is over 80% and the class changed
-            if (highestProb > 0.80 && bestClassIndex !== lastValue) {
-                lastValue = bestClassIndex;
+            const className = prediction[bestClassIndex].className;
+            const confidence = (highestProb * 100).toFixed(0);
+
+            if (highestProb > 0.85 && className !== lastValue) {
+                lastValue = className; // Store the name to prevent spamming
                 
-                // Send the index (0, 1, or 2) to Blynk Virtual Pin V1
-                fetch(`https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&v1=${bestClassIndex}`, {mode: 'no-cors'})
-                .then(() => info("Blynk Updated: " + prediction[bestClassIndex].className));
+                const pin = "v3"; 
+                
+                const encodedName = encodeURIComponent(className);
+                
+                fetch(`https://blynk.cloud/external/api/update?token=${BLYNK_TOKEN}&${pin}=${encodedName}`, {mode: 'no-cors'})
+                .then(() => info("Blynk Updated Label: " + className))
+                .catch(err => info("Blynk Error: " + err));
             }
 
-            // 3. Update the UI text
-            labelContainer.innerHTML = `Detecting: ${prediction[bestClassIndex].className} (${(highestProb * 100).toFixed(0)}%)`;
+            labelContainer.innerHTML = `${className} (${confidence}%)`;
         }
     </script>
 </body>
